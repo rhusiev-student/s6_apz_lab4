@@ -7,7 +7,6 @@ import asyncio
 from contextlib import asynccontextmanager
 import argparse
 
-# Configure logging
 logging.basicConfig(
     format="%(asctime)s - %(levelname)s - %(message)s",
     level=logging.INFO,

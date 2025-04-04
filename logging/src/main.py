@@ -19,7 +19,9 @@ logger.setLevel(logging.INFO)
 async def serve(hazelcaster: Hazelcaster, num: int, ip_address: str, ip_config: str):
     with hazelcaster:
         srv = aio.server()
-        logging_pb2_grpc.add_LoggingServiceServicer_to_server(Logger(hazelcaster, logger), srv)
+        logging_pb2_grpc.add_LoggingServiceServicer_to_server(
+            Logger(hazelcaster, logger), srv
+        )
 
         port = num + 13228
         listen_address = f"0.0.0.0:{port}"

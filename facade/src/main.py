@@ -5,7 +5,7 @@ import uuid
 from grpc import aio
 import httpx
 import uvicorn
-from fastapi import FastAPI, Query, Depends, HTTPException, Response, status
+from fastapi import FastAPI, Depends, HTTPException, Response, status
 from fastapi.responses import PlainTextResponse
 
 from grpc_generated import logging_pb2, logging_pb2_grpc
@@ -44,11 +44,9 @@ async def create_grpc_client(logging_url):
     return logging_pb2_grpc.LoggingServiceStub(channel)
 
 
-def format_error(err):
-    # If it's an AioRpcError, extract a friendlier message.
+def format_grpc_error(err):
     if hasattr(err, "code") and hasattr(err, "details"):
         return f"gRPC error ({err.code()}): {err.details()}"
-    # Otherwise just return the basic error string.
     return str(err)
 
 
@@ -60,8 +58,7 @@ def retry_decorator(max_retries=MAX_RETRIES, delay_ms=RETRY_DELAY_MS, refresh_fn
                 try:
                     return await fn(*args, **kwargs)
                 except Exception as err:
-                    # Use the formatted error message here.
-                    print(f"Error on attempt {attempts + 1}: {format_error(err)}")
+                    print(f"Error on attempt {attempts + 1}: {format_grpc_error(err)}")
                     if attempts >= max_retries:
                         raise
                     if refresh_fn:
@@ -78,9 +75,7 @@ app = FastAPI()
 
 
 @app.post("/")
-async def add_log(
-    message: str = Query(...), client: Client = Depends(lambda: app.state.client)
-):
+async def add_log(message: str, client: Client = Depends(lambda: app.state.client)):
     log_uuid = str(uuid.uuid4())
 
     async def refresh_url(_):
