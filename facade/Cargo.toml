@@ -1,0 +1,22 @@
+[package]
+name = "facade"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+tonic = "0.12.3"
+prost = "0.13"
+tokio = { version = "1.0", features = ["macros", "rt-multi-thread"] }
+axum = "0.8.1"
+reqwest = { version = "0.12", features = ["json"] }
+
+[dependencies.uuid]
+version = "1.13.1"
+features = [
+    "v4",                # Lets you generate random UUIDs
+    "fast-rng",          # Use a faster (but still sufficiently random) RNG
+    "macro-diagnostics", # Enable better diagnostics for compile-time UUIDs
+]
+
+[build-dependencies]
+tonic-build = "0.12.3"
