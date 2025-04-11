@@ -95,7 +95,7 @@ async def add_log(message: str, client: Client = Depends(lambda: app.state.clien
         return await grpc_client.AddLog(log)
 
     app.state.logging_urls = await client.get_possible_addresses("logging")
-    app.state.current_url_logging = 0
+    app.state.current_url_logging = random.randint(0, len(app.state.logging_urls) - 1)
 
     if not app.state.logging_urls:
         raise HTTPException(
