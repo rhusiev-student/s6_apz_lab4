@@ -18,6 +18,7 @@ logger.setLevel(logging.INFO)
 
 async def serve(hazelcaster: Hazelcaster, num: int, ip_address: str, ip_config: str):
     with hazelcaster:
+        logger.info(f"Started hazelcast on port {hazelcaster.port}")
         srv = aio.server()
         logging_pb2_grpc.add_LoggingServiceServicer_to_server(
             Logger(hazelcaster, logger), srv
@@ -34,6 +35,7 @@ async def serve(hazelcaster: Hazelcaster, num: int, ip_address: str, ip_config: 
         )
         if response.status_code != 200:
             logger.error(f"Failed to set ip in config: {response}")
+        logger.info(f"Started server on {listen_address}")
         await srv.start()
         await srv.wait_for_termination()
 
@@ -48,5 +50,6 @@ if __name__ == "__main__":
     ip_address: str = args.ip_address
     ip_config: str = args.ip_config
 
+    logger.info("Starting hazelcast logging server")
     hazelcaster = Hazelcaster("logging", num)
     asyncio.run(serve(hazelcaster, num, ip_address, ip_config))

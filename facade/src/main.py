@@ -1,6 +1,7 @@
 import asyncio
 import sys
 import uuid
+import random
 
 from grpc import aio
 import httpx
@@ -9,6 +10,8 @@ from fastapi import FastAPI, Depends, HTTPException, Response, status
 from fastapi.responses import PlainTextResponse
 
 from grpc_generated import logging_pb2, logging_pb2_grpc
+
+from kafka import produce_message
 
 MAX_RETRIES = 3
 RETRY_DELAY_MS = 500
@@ -102,31 +105,49 @@ async def add_log(message: str, client: Client = Depends(lambda: app.state.clien
 
     try:
         await make_request()
-        return Response(status_code=status.HTTP_200_OK)
     except Exception:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to add log",
         )
 
+    try:
+        produce_message({"message": message})
+    except Exception:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to add message",
+        )
+    return Response(status_code=status.HTTP_200_OK)
+
 
 @app.get("/")
 async def get_logs(client: Client = Depends(lambda: app.state.client)):
-    message_urls = await client.get_possible_addresses("messages")
-    if not message_urls:
+    app.state.messages_urls = await client.get_possible_addresses("messages")
+    if not app.state.messages_urls:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="No message service available",
         )
+    app.state.current_url_messages = random.randint(0, len(app.state.messages_urls) - 1)
 
-    current_url = message_urls[0]
-    try:
+    async def refresh_url(_):
+        current = app.state.current_url_messages
+        total = len(app.state.messages_urls)
+        app.state.current_url_messages = (current + 1) % total
+
+    @retry_decorator(refresh_fn=refresh_url)
+    async def make_request():
+        current = app.state.current_url_messages
+        urls = app.state.messages_urls
         async with httpx.AsyncClient() as ac:
-            resp = await ac.get(f"http://{current_url}")
+            resp = await ac.get(f"http://{urls[current]}")
             resp.raise_for_status()
-            message_text = resp.text
+            return resp.text
+
+    try:
+        message_text = await make_request()
     except Exception as e:
-        print(f"Error getting message: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e)
         )
@@ -145,13 +166,13 @@ async def get_logs(client: Client = Depends(lambda: app.state.client)):
         return await grpc_client.GetLogs(req)
 
     app.state.logging_urls = await client.get_possible_addresses("logging")
-    app.state.current_url_logging = 0
 
     if not app.state.logging_urls:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="No logging service available",
         )
+    app.state.current_url_logging = random.randint(0, len(app.state.logging_urls) - 1)
 
     try:
         response = await make_request()
